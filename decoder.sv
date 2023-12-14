@@ -22,9 +22,9 @@
 
 module decoder(
     input [31:0]inst,
-    output logic [9:0]rf_addr1,
-    output logic [9:0]rf_addr2,
-    output logic [9:0]rf_rd,
+    output logic [4:0]rf_addr1,
+    output logic [4:0]rf_addr2,
+    output logic [4:0]rf_rd,
     output logic rf_we,
     output logic [31:0]imm,
     output logic [11:0]alu_op,
@@ -39,9 +39,9 @@ module decoder(
     begin
         if(inst[31:15] == 17'b00000000000100000)//ADD
         begin
-            rf_addr1 = {5'b0,inst[9:5]};
-            rf_addr2 = {5'b0,inst[14:10]};
-            rf_rd = {5'b0,inst[4:0]};
+            rf_addr1 = inst[9:5];
+            rf_addr2 = inst[14:10];
+            rf_rd = inst[4:0];
             rf_we = 1'b1;
             imm = 32'b0;
             mem_we = 1'b0;
@@ -53,9 +53,9 @@ module decoder(
         end
         else if(inst[31:22] == 10'b0000001010)//ADDI
         begin
-            rf_addr1 = {5'b0,inst[9:5]};
-            rf_addr2 = 10'b0;//其实用不到
-            rf_rd = {5'b0,inst[4:0]};
+            rf_addr1 = inst[9:5];
+            rf_addr2 = 5'b0;//其实用不到
+            rf_rd = inst[4:0];
             rf_we = 1'b1;
             imm = {{20{inst[21]}}, inst[21:10]};
             mem_we = 1'b0;
@@ -67,9 +67,9 @@ module decoder(
         end
         else if(inst[31:22] == 10'b0010100010)//LD
         begin
-            rf_addr1 = {5'b0,inst[9:5]};
-            rf_addr2 = 10'b0;//其实用不到
-            rf_rd = {5'b0,inst[4:0]};
+            rf_addr1 = inst[9:5];
+            rf_addr2 = 5'b0;//其实用不到
+            rf_rd = inst[4:0];
             rf_we = 1'b1;
             imm = {{20{inst[21]}}, inst[21:10]};
             mem_we = 1'b0;
@@ -81,9 +81,9 @@ module decoder(
         end
         else if(inst[31:22] == 10'b0010100110)//ST
         begin
-            rf_addr1 = {5'b0,inst[9:5]};
-            rf_addr2 = {5'b0,inst[4:0]};//rd但本次用于读
-            rf_rd = 10'b0;//本次就不用了
+            rf_addr1 = inst[9:5];
+            rf_addr2 = inst[4:0];//rd但本次用于读
+            rf_rd = 5'b0;//本次就不用了
             rf_we = 1'b0;
             imm = {{20{inst[21]}}, inst[21:10]};
             mem_we = 1'b1;
@@ -95,8 +95,8 @@ module decoder(
         end
         else if(inst[31:25] == 7'b0001010)//luli
         begin
-            rf_addr1 = 10'b0;//其实用不到
-            rf_addr2 = 10'b0;//其实用不到
+            rf_addr1 = 5'b0;//其实用不到
+            rf_addr2 = 5'b0;//其实用不到
             rf_rd = {5'b0,inst[4:0]};
             rf_we = 1'b1;
             imm = {inst[24:5],12'b0};
@@ -111,7 +111,7 @@ module decoder(
         begin
             rf_addr1 = inst[9:5];
             rf_addr2 = inst[4:0];
-            rf_rd = 10'b0;//其实用不到
+            rf_rd = 5'b0;//其实用不到
             rf_we = 1'b0;
             imm = {{14{inst[25]}}, inst[25:10], 2'b0};
             mem_we = 1'b0;
@@ -123,9 +123,9 @@ module decoder(
         end
         else
         begin
-            rf_addr1 = 10'b0;//其实用不到
-            rf_addr2 = 10'b0;//其实用不到
-            rf_rd = 10'b0;//其实用不到
+            rf_addr1 = 5'b0;//其实用不到
+            rf_addr2 = 5'b0;//其实用不到
+            rf_rd = 5'b0;//其实用不到
             rf_we = 1'b0;
             imm = 32'b0;
             mem_we = 1'b0;
