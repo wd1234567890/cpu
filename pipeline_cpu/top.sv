@@ -89,6 +89,7 @@ module top(
     logic        wb_sel_3r;
     logic        wb_sel;
     logic [31:0] alu_result_r;
+    logic [31:0] alu_result_2r;//add指令中间有访存不执行
     logic [31:0] jump_target_r;
     logic        jump_en_r;
     logic [31:0] jump_target;
@@ -99,7 +100,7 @@ module top(
 
 
 
-    assign mem_addr = alu_result[11:2];
+    assign mem_addr = alu_result_2r[11:2];
     assign mem_wdata = rf_data2;
 
     //hazard
@@ -165,20 +166,20 @@ register_execute (
         .rstn(rstn),
         .en(1'b1),
         .d({alu_result_r,jump_en_r,jump_target_r,mem_we_2r,rf_rd_2r,rf_we_2r,wb_sel_2r}),//此处men_we发挥作用结束
-        .q({alu_result,jump_en,jump_target,mem_we,rf_rd_3r,rf_we_3r,wb_sel_3r})
+        .q({alu_result_2r,jump_en,jump_target,mem_we,rf_rd_3r,rf_we_3r,wb_sel_3r})
     );
 
     //访存阶段->写回阶段
     register #(
-        .WIDTH(39),
+        .WIDTH(71),
         .RST_VAL(0)
     )
 register_mem (
         .clk(clk),
         .rstn(rstn),
         .en(1'b1),
-        .d({mem_rdata_r,rf_we_3r,rf_rd_3r,wb_sel_3r}),
-        .q({mem_rdata,rf_we,rf_rd,wb_sel})
+        .d({alu_result_2r,mem_rdata_r,rf_we_3r,rf_rd_3r,wb_sel_3r}),
+        .q({alu_result,mem_rdata,rf_we,rf_rd,wb_sel})
     );
 
     register #(
@@ -228,13 +229,13 @@ register_branch (
     //PCmux 2->1
     always @(*)
     begin
-        if(PC_sel)
-        begin
-            npc = PC;
-        end
-        else if(jump_en)
+        if(jump_en)
         begin
             npc = jump_target;
+        end
+        else if(PC_sel)
+        begin
+            npc = PC;
         end
         else
         begin
@@ -327,8 +328,6 @@ register_branch (
     .wb_sel(wb_sel_r)
     );
 
-
-
     //是否debug状态
     always @(*)
     begin
@@ -336,18 +335,6 @@ register_branch (
             clk = clk_ld;
         else clk = clk_cpu;
     end
-
-    register # (
-        .WIDTH(32),
-        .RST_VAL(0)
-      )
-      register_rfdata1 (
-        .clk(clk),
-        .rstn(rstn),
-        .en(1'b1),
-        .d(inst_r),
-        .q(inst)
-        );
 
     //寄存器堆
     reg_files # (

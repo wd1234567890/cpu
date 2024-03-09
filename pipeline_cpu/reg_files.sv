@@ -33,6 +33,16 @@ module  reg_files # (
 );
     reg [DATA_WIDTH -1:0]  rf [0:(1<<ADDR_WIDTH)-1];    //寄存器堆
 
+    //初始化，方便调试
+    generate
+        integer i;
+        initial
+        begin
+             for (i = 0; i < 32; i = i + 1)
+                 rf[i] = {32'h00000000};
+        end
+     endgenerate
+
     //读操作：写优先，异步读
     assign rd0 = (wa == ra0 && we && wa != 0) ? wd : rf[ra0];   
     assign rd1 = (wa == ra1 && we && wa != 0) ? wd : rf[ra1];

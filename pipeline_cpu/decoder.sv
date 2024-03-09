@@ -125,7 +125,7 @@ module decoder(
         begin
             rf_addr1 = 5'b0;//其实用不到
             rf_addr2 = 5'b0;//其实用不到
-            rf_rd = 5'b0;//其实用不到
+            rf_rd = 5'b11111;//防止开头进行forwarding判断
             rf_we = 1'b0;
             imm = 32'b0;
             mem_we = 1'b0;

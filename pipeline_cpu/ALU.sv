@@ -33,7 +33,7 @@ module ALU(
 
     logic less_m1;//无符号小于
     logic less_m2;//有符号小于
-    logic [63:0] result;
+    //logic [63:0] result;//用于乘法
 
     //assign ctr = f[1];
     assign B = b^{32{f[1]|f[2]|f[3]}};
