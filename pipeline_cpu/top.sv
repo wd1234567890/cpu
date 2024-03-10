@@ -46,6 +46,8 @@ module top(
 
     logic        clk;
     logic [31:0] inst_r;
+    logic [31:0] inst_rx;
+    logic        inst_sel;
     logic [31:0] rf_data1;
     logic [31:0] rf_data1_r;
     logic [31:0] rf_data1_rx;
@@ -82,8 +84,10 @@ module top(
     logic [9:0]  mem_addr;
     logic [31:0] mem_wdata;
     logic [31:0] mem_rdata_r;
+    logic        br_type_rx;
     logic        br_type_r;
     logic        br_type;
+    logic        br_type_sel;
     logic        wb_sel_r;
     logic        wb_sel_2r;
     logic        wb_sel_3r;
@@ -91,7 +95,9 @@ module top(
     logic [31:0] alu_result_r;
     logic [31:0] alu_result_2r;//add指令中间有访存不执行
     logic [31:0] jump_target_r;
+    //logic        jump_en_sel;
     logic        jump_en_r;
+    //logic        jump_en_rx;
     logic [31:0] jump_target;
     logic        jump_en;
     logic        jump_en_l;
@@ -101,7 +107,7 @@ module top(
 
 
     assign mem_addr = alu_result_2r[11:2];
-    assign mem_wdata = rf_data2;
+    //assign mem_wdata = rf_data2;//此时mem_wdata与rf_data2直接相连，但是rf_data2是执行阶段产生的信号，要到访存阶段才能写入内存，所以再加一个寄存器
 
     //hazard
     hazard hazard(
@@ -111,12 +117,14 @@ module top(
         .rf_addr1(rf_addr1),
         .rf_addr2(rf_addr2),
         .rf_rd_2r(rf_rd_2r),
-        .mem_we_r(mem_we_r),
-        .wb_sel_r(wb_sel_r),
-        .br_type_r(br_type_r),
+        .mem_we_2r(mem_we_2r),
+        .wb_sel_2r(wb_sel_2r),
+        .br_type(br_type),
         .PC_sel(PC_sel),
         .rf_we_sel(rf_we_sel),
-        .mem_we_sel(mem_we_sel)
+        .mem_we_sel(mem_we_sel),
+        .inst_sel(inst_sel),
+        .br_type_sel(br_type_sel)
     );
 
     //数据相关前递单元
@@ -158,15 +166,15 @@ register_decode (
 
     //执行阶段->访存阶段
     register #(
-        .WIDTH(73),
+        .WIDTH(105),
         .RST_VAL(0)
     )
 register_execute (
         .clk(clk),
         .rstn(rstn),
         .en(1'b1),
-        .d({alu_result_r,jump_en_r,jump_target_r,mem_we_2r,rf_rd_2r,rf_we_2r,wb_sel_2r}),//此处men_we发挥作用结束
-        .q({alu_result_2r,jump_en,jump_target,mem_we,rf_rd_3r,rf_we_3r,wb_sel_3r})
+        .d({alu_result_r,jump_en_r,jump_target_r,mem_we_2r,rf_rd_2r,rf_we_2r,wb_sel_2r,rf_data2}),//此处men_we发挥作用结束
+        .q({alu_result_2r,jump_en,jump_target,mem_we,rf_rd_3r,rf_we_3r,wb_sel_3r,mem_wdata})
     );
 
     //访存阶段->写回阶段
@@ -231,7 +239,7 @@ register_branch (
     begin
         if(jump_en)
         begin
-            npc = jump_target;
+            npc = jump_target - 32'h8;//分支跳转时，流水线阻塞了两个周期，所以要减8
         end
         else if(PC_sel)
         begin
@@ -249,8 +257,8 @@ register_branch (
         case(rf_data1_sel)
             2'b00: rf_data1_r = rf_data1_rx;
             2'b01: rf_data1_r = alu_result_r;
-            2'b10: rf_data1_r = alu_result;
-            2'b11: rf_data1_r = mem_rdata;
+            2'b10: rf_data1_r = alu_result_2r;
+            2'b11: rf_data1_r = mem_rdata_r;
             default: rf_data1_r = rf_data1_rx;
         endcase
     end
@@ -261,8 +269,8 @@ register_branch (
         case(rf_data2_sel)
             2'b00: rf_data2_r = rf_data2_rx;
             2'b01: rf_data2_r = alu_result_r;
-            2'b10: rf_data2_r = alu_result;
-            2'b11: rf_data2_r = mem_rdata;
+            2'b10: rf_data2_r = alu_result_2r;
+            2'b11: rf_data2_r = mem_rdata_r;
             default: rf_data2_r = rf_data2_rx;
         endcase
     end
@@ -291,6 +299,24 @@ register_branch (
             rf_we_r = 1'b0;
         else
             rf_we_r = rf_we_rx;
+    end
+
+    //inst mux 2->1判断是否hazard回去执行一下
+    always@(*)
+    begin
+        if(inst_sel)
+            inst_r = inst;
+        else
+            inst_r = inst_rx;
+    end
+
+    //br_type mux 2->1
+    always@(*)
+    begin
+        if(br_type_sel)
+            br_type_r = 1'b0;
+        else
+            br_type_r = br_type_rx;
     end
 
     //分支跳转
@@ -324,7 +350,7 @@ register_branch (
     .alu_src1_sel(alu_src1_sel_r),
     .alu_src2_sel(alu_src2_sel_r),
     .mem_we(mem_we_rx),
-    .br_type(br_type_r),
+    .br_type(br_type_rx),
     .wb_sel(wb_sel_r)
     );
 
@@ -367,7 +393,7 @@ register_branch (
     dram_inst dram_inst(
         .a(PC[11:2]),//四个字节对应一个字 in looogarch
         .d(32'b0),
-        .spo(inst_r),
+        .spo(inst_rx),
         .we(1'b0),
         .clk(clk),
         .dpra(addr[9:0]),

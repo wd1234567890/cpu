@@ -38,7 +38,7 @@ module forwarding(
         else if(rf_addr1 == rf_rd_3r && wb_sel_3r == 1'b1)
             rf_data1_sel = 2'b10;
         else if(rf_addr1 == rf_rd_3r && wb_sel_3r == 1'b0)
-            rf_data1_sel = 2'b01;
+            rf_data1_sel = 2'b11;
         else
             rf_data1_sel = 2'b00;
     end
@@ -50,7 +50,7 @@ module forwarding(
         else if(rf_addr2 == rf_rd_3r && wb_sel_3r == 1'b1)
             rf_data2_sel = 2'b10;
         else if(rf_addr2 == rf_rd_3r && wb_sel_3r == 1'b0)
-            rf_data2_sel = 2'b01;
+            rf_data2_sel = 2'b11;
         else
             rf_data2_sel = 2'b00;
     end
