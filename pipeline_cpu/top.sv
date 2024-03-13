@@ -371,8 +371,10 @@ register_branch (
         .clk(clk),
         .ra0(rf_addr1),
         .ra1(rf_addr2),
+        .ra2(addr[4:0]),
         .rd0(rf_data1_rx),
         .rd1(rf_data2_rx),
+        .rd2(dout_rf),
         .wa(rf_rd),
         .wd(rf_wdata),
         .we(rf_we)
