@@ -70,6 +70,8 @@ module top(
     logic        rf_we_2r;
     logic        rf_we_3r;
     logic [31:0] imm_r;
+    logic [11:0] b_op_r;
+    logic [11:0] b_op;
     logic [11:0] alu_op_r;
     logic [11:0] alu_op;
     logic [1:0]  alu_src1_sel_r;
@@ -83,7 +85,9 @@ module top(
     logic        mem_we_sel;
     logic [9:0]  mem_addr;
     logic [31:0] mem_wdata;
+    logic [31:0] mem_wdatacl;//变长
     logic [31:0] mem_rdata_r;
+    logic [31:0] mem_rdataw;
     logic        br_type_rx;
     logic        br_type_r;
     logic        br_type;
@@ -102,8 +106,12 @@ module top(
     logic        jump_en;
     logic        jump_en_l;
     logic        PC_sel;
-
-
+    logic [1:0]  wlong;
+    logic [1:0]  wlong_r;
+    logic [1:0]  wlong_2r;
+    logic [1:0]  wlong_3r;
+    logic [31:0] PC_r;
+    logic [31:0] PC_2r;
 
 
     assign mem_addr = alu_result_2r[11:2];
@@ -140,54 +148,66 @@ module top(
 
     //取指阶段->译码阶段
     register # (
-    .WIDTH(32),
+    .WIDTH(64),
     .RST_VAL(0)
     )
 register_inst (
     .clk(clk),
     .rstn(rstn),
     .en(1'b1),
-    .d(inst_r),
-    .q(inst)
+    .d({inst_r,PC}),
+    .q({inst,PC_r})
     );
 
     //译码阶段->执行阶段
     register #(
-        .WIDTH(121),
+        .WIDTH(133),
         .RST_VAL(0)
     )
 register_decode (
         .clk(clk),
         .rstn(rstn),
         .en(1'b1),
-        .d({imm_r,alu_src1_sel_r,alu_src2_sel_r,rf_data1_r,rf_data2_r,alu_op_r,mem_we_r,br_type_r,wb_sel_r,rf_rd_r,rf_we_r}),
-        .q({imm,alu_src1_sel,alu_src2_sel,rf_data1,rf_data2,alu_op,mem_we_2r,br_type,wb_sel_2r,rf_rd_2r,rf_we_2r})
+        .d({imm_r,alu_src1_sel_r,alu_src2_sel_r,rf_data1_r,rf_data2_r,alu_op_r,b_op_r,mem_we_r,br_type_r,wb_sel_r,rf_rd_r,rf_we_r}),
+        .q({imm,alu_src1_sel,alu_src2_sel,rf_data1,rf_data2,alu_op,b_op,mem_we_2r,br_type,wb_sel_2r,rf_rd_2r,rf_we_2r})
+    );
+
+    register #(
+        .WIDTH(34),
+        .RST_VAL(0)
+    )
+register_decode2(
+    .clk(clk),
+    .rstn(rstn),
+    .en(1'b1),
+    .d({wlong_r,PC_r}),
+    .q({wlong_2r,PC_2r})
     );
 
     //执行阶段->访存阶段
     register #(
-        .WIDTH(105),
+        .WIDTH(107),
         .RST_VAL(0)
     )
 register_execute (
         .clk(clk),
         .rstn(rstn),
         .en(1'b1),
-        .d({alu_result_r,jump_en_r,jump_target_r,mem_we_2r,rf_rd_2r,rf_we_2r,wb_sel_2r,rf_data2}),//此处men_we发挥作用结束
-        .q({alu_result_2r,jump_en,jump_target,mem_we,rf_rd_3r,rf_we_3r,wb_sel_3r,mem_wdata})
+        .d({alu_result_r,jump_en_r,jump_target_r,mem_we_2r,rf_rd_2r,rf_we_2r,wb_sel_2r,rf_data2,wlong_2r}),//此处mem_we发挥作用结束
+        .q({alu_result_2r,jump_en,jump_target,mem_we,rf_rd_3r,rf_we_3r,wb_sel_3r,mem_wdata,wlong_3r})
     );
 
     //访存阶段->写回阶段
     register #(
-        .WIDTH(71),
+        .WIDTH(73),
         .RST_VAL(0)
     )
 register_mem (
         .clk(clk),
         .rstn(rstn),
         .en(1'b1),
-        .d({alu_result_2r,mem_rdata_r,rf_we_3r,rf_rd_3r,wb_sel_3r}),
-        .q({alu_result,mem_rdata,rf_we,rf_rd,wb_sel})
+        .d({alu_result_2r,mem_rdata_r,rf_we_3r,rf_rd_3r,wb_sel_3r,wlong_3r}),
+        .q({alu_result,mem_rdata,rf_we,rf_rd,wb_sel,wlong})
     );
 
     register #(
@@ -206,7 +226,7 @@ register_branch (
     always @(*)
     begin
         case (alu_src1_sel)
-            2'b00: alu_src1 = PC;
+            2'b00: alu_src1 = PC_2r;
             2'b01: alu_src1 = rf_data1;
             2'b10: alu_src1 = 32'b0; 
             default: alu_src1 = rf_data1;
@@ -230,8 +250,30 @@ register_branch (
         case (wb_sel)
             1'b0: rf_wdata = mem_rdata;
             1'b1: rf_wdata = alu_result;
-            default: rf_wdata = mem_rdata;
         endcase
+    end
+
+    //半字or字节读取导致增加的多选器
+    always @(*)
+    begin
+        case (wlong)
+            2'b00: mem_rdata_r = mem_rdataw;
+            2'b01: mem_rdata_r = {24'b0,mem_rdataw[7:0]};//byte
+            2'b10: mem_rdata_r = {16'b0,mem_rdataw[15:0]};//half word
+            default: mem_rdata_r = mem_rdataw;
+        endcase
+    end
+
+    always @(*)
+    begin
+        if(wlong_3r == 2'b00)
+            mem_wdatacl = mem_wdata;
+        else if(wlong_3r == 2'b01)
+            mem_wdatacl = {24'b0,mem_wdata[7:0]};
+        else if(wlong_3r == 2'b10)
+            mem_wdatacl = {16'b0,mem_wdata[15:0]};
+        else
+            mem_wdatacl = mem_wdata;
     end
 
     //PCmux 2->1
@@ -239,7 +281,7 @@ register_branch (
     begin
         if(jump_en)
         begin
-            npc = jump_target - 32'h8;//分支跳转时，流水线阻塞了两个周期，所以要减8
+            npc = jump_target;//分支跳转时，流水线阻塞了两个周期，所以要减8;此处改用源PC即2个时延以前的计算jump_target
         end
         else if(PC_sel)
         begin
@@ -259,7 +301,6 @@ register_branch (
             2'b01: rf_data1_r = alu_result_r;
             2'b10: rf_data1_r = alu_result_2r;
             2'b11: rf_data1_r = mem_rdata_r;
-            default: rf_data1_r = rf_data1_rx;
         endcase
     end
 
@@ -271,7 +312,6 @@ register_branch (
             2'b01: rf_data2_r = alu_result_r;
             2'b10: rf_data2_r = alu_result_2r;
             2'b11: rf_data2_r = mem_rdata_r;
-            default: rf_data2_r = rf_data2_rx;
         endcase
     end
 
@@ -321,10 +361,11 @@ register_branch (
 
     //分支跳转
     branch branch(
-    .PC(PC),
+    .PC(PC_2r),
     .imm(imm),
     .rf_data1(rf_data1),
     .rf_data2(rf_data2),
+    .op(b_op),
     .br_type(br_type),
     .jump_en(jump_en_r),
     .jump_target(jump_target_r)
@@ -347,11 +388,13 @@ register_branch (
     .rf_we(rf_we_rx),
     .imm(imm_r),
     .alu_op(alu_op_r),
+    .b_op(b_op_r),  
     .alu_src1_sel(alu_src1_sel_r),
     .alu_src2_sel(alu_src2_sel_r),
     .mem_we(mem_we_rx),
     .br_type(br_type_rx),
-    .wb_sel(wb_sel_r)
+    .wb_sel(wb_sel_r),
+    .wlong(wlong_r)
     );
 
     //是否debug状态
@@ -383,8 +426,8 @@ register_branch (
     //取写数据
     dram_data dram_data(
         .a(mem_addr),
-        .d(mem_wdata),
-        .spo(mem_rdata_r),
+        .d(mem_wdatacl),
+        .spo(mem_rdataw),
         .we(mem_we),
         .clk(clk),
         .dpra(addr[9:0]),

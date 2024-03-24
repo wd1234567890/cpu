@@ -38,7 +38,7 @@ module hazard(
     //output logic jump_en_sel
     );
 
-    always @(*)//PC应该在阻塞后就正常了，我还没正常
+    always @(*)
     begin
         if(jump_en || jump_en_r)
         begin

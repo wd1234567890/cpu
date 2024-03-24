@@ -33,7 +33,7 @@ module forwarding(
     //组合逻辑单元没有延迟，一个周期干好,通过寄存器里wb_sel指，提前判断给哪个（防止落到下一个周期更为复杂）
     always @(*)
     begin
-        if(rf_addr1 == rf_rd_2r)
+        if(rf_addr1 == rf_rd_2r && rf_rd_2r != 5'b0)
             rf_data1_sel = 2'b01;
         else if(rf_addr1 == rf_rd_3r && wb_sel_3r == 1'b1)
             rf_data1_sel = 2'b10;
@@ -45,7 +45,7 @@ module forwarding(
 
     always @(*)
     begin
-        if(rf_addr2 == rf_rd_2r)
+        if(rf_addr2 == rf_rd_2r && rf_rd_2r != 5'b0)
             rf_data2_sel = 2'b01;
         else if(rf_addr2 == rf_rd_3r && wb_sel_3r == 1'b1)
             rf_data2_sel = 2'b10;
